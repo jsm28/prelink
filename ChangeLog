@@ -1,3 +1,11 @@
+2020-02-13  Joseph Myers  <joseph@codesourcery.com>
+
+	* src/arch-aarch64.c (aarch64_prelink_rela): Do not condition
+	R_AARCH64_TLS_DTPREL handling on dso->ehdr.e_type == ET_EXEC &&
+	info->resolvetls.
+	(aarch64_prelink_conflict_rela): Use addend in
+	R_AARCH64_TLS_DTPREL handling.
+
 2020-02-12  Joseph Myers  <joseph@codesourcery.com>
 
 	* src/arch-aarch64.c (aarch64_undo_prelink_rela): Do not write 0

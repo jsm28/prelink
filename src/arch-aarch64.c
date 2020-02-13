@@ -193,9 +193,7 @@ aarch64_prelink_rela (struct prelink_info *info, GElf_Rela *rela,
       write_neclass (dso, rela->r_offset, dso->info_DT_TLSDESC_PLT);
       break;
     case R_AARCH64_TLS_DTPREL:
-      if (dso->ehdr.e_type == ET_EXEC && info->resolvetls)
-	write_neclass (dso, rela->r_offset,
-		      value + rela->r_addend);
+      write_neclass (dso, rela->r_offset, value + rela->r_addend);
       break;
     case R_AARCH64_TLS_DTPMOD:
       if (dso->ehdr.e_type == ET_EXEC)
@@ -366,7 +364,7 @@ aarch64_prelink_conflict_rela (DSO *dso, struct prelink_info *info,
 	  ret->r_addend = tls->modid;
 	  break;
 	case R_AARCH64_TLS_DTPREL:
-	  ret->r_addend = value;
+	  ret->r_addend = value + rela->r_addend;
 	  break;
 	case R_AARCH64_TLS_TPREL:
 	  ret->r_addend = value + rela->r_addend + tls->offset;
