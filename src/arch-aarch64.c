@@ -470,9 +470,7 @@ aarch64_undo_prelink_rela (DSO *dso, GElf_Rela *rela, GElf_Addr relaaddr)
   switch (GELF_R_TYPE (rela->r_info))
     {
     case R_AARCH64_NONE:
- 	break;	
     case R_AARCH64_RELATIVE:
-	write_ne64 (dso, rela->r_offset, 0);
       break;
     case R_AARCH64_JUMP_SLOT:
       sec = addr_to_sec (dso, rela->r_offset);
