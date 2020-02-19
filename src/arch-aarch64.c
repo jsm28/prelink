@@ -497,7 +497,8 @@ aarch64_undo_prelink_rela (DSO *dso, GElf_Rela *rela, GElf_Addr relaaddr)
       write_ne64 (dso, rela->r_offset, 0);
       break;
     case R_AARCH64_TLS_TPREL:
-      write_ne64 (dso, rela->r_offset, 0);
+      if (dso->ehdr.e_type == ET_EXEC)
+	write_ne64 (dso, rela->r_offset, 0);
       break;
     case R_AARCH64_TLSDESC:
       write_ne64 (dso, rela->r_offset, 0);
