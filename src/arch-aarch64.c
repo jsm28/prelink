@@ -30,22 +30,6 @@
 
 #include "prelink.h"
 
-/* The aarch64 ABI: http://infocenter.arm.com/help/topic/com.arm.doc.ihi0056b/IHI0056B_aaelf64.pdf
- * documents a "class" value for specific reads and writes.  All this
- * indicates is that we should be using the ELFCLASS to determine if
- * this should be a 32/64 bit read/write.  (See table 4.9)
- *
- * We emulate this behavior below...
- */
-#define read_uneclass(DSO, ADDR) \
-( gelf_getclass(DSO->elf) == ELFCLASS32 ? read_une32(DSO, ADDR) : read_une64(DSO, ADDR) )
-
-#define write_neclass(DSO, ADDR, VAL) \
-( gelf_getclass(DSO->elf) == ELFCLASS32 ? write_ne32(DSO, ADDR, VAL) : write_ne64(DSO, ADDR, VAL) )
-
-#define buf_write_neclass(DSO, BUF, VAL) \
-( gelf_getclass(DSO->elf) == ELFCLASS32 ? buf_write_ne32(DSO, BUF, VAL) : buf_write_ne64(DSO, BUF, VAL) )
-
 static int
 aarch64_adjust_dyn (DSO *dso, int n, GElf_Dyn *dyn, GElf_Addr start,
 		    GElf_Addr adjust)
@@ -113,8 +97,8 @@ aarch64_adjust_rela (DSO *dso, GElf_Rela *rela, GElf_Addr start,
     case R_AARCH64_RELATIVE:
       if (rela->r_addend >= start)
 	{
-	  if (read_uneclass (dso, rela->r_offset) == rela->r_addend)
-	    write_neclass (dso, rela->r_offset, rela->r_addend + adjust);
+	  if (read_une64 (dso, rela->r_offset) == rela->r_addend)
+	    write_ne64 (dso, rela->r_offset, rela->r_addend + adjust);
 	  rela->r_addend += adjust;
 	}
       break;
@@ -123,9 +107,9 @@ aarch64_adjust_rela (DSO *dso, GElf_Rela *rela, GElf_Addr start,
 	rela->r_addend += adjust;
       /* FALLTHROUGH */
     case R_AARCH64_JUMP_SLOT:
-      addr = read_uneclass (dso, rela->r_offset);
+      addr = read_une64 (dso, rela->r_offset);
       if (addr >= start)
-	write_neclass (dso, rela->r_offset, addr + adjust);
+	write_ne64 (dso, rela->r_offset, addr + adjust);
       break;
     }
   return 0;
@@ -152,7 +136,7 @@ aarch64_prelink_rela (struct prelink_info *info, GElf_Rela *rela,
     return 0;
   else if (GELF_R_TYPE (rela->r_info) == R_AARCH64_RELATIVE)
     {
-      write_neclass (dso, rela->r_offset, rela->r_addend);
+      write_ne64 (dso, rela->r_offset, rela->r_addend);
       return 0;
     }
   value = info->resolve (info, GELF_R_SYM (rela->r_info),
@@ -161,7 +145,7 @@ aarch64_prelink_rela (struct prelink_info *info, GElf_Rela *rela,
     {
     case R_AARCH64_GLOB_DAT:
     case R_AARCH64_JUMP_SLOT:
-      write_neclass (dso, rela->r_offset, value + rela->r_addend);
+      write_ne64 (dso, rela->r_offset, value + rela->r_addend);
       break;
     case R_AARCH64_ABS64:
       write_ne64 (dso, rela->r_offset, value + rela->r_addend);
@@ -171,8 +155,8 @@ aarch64_prelink_rela (struct prelink_info *info, GElf_Rela *rela,
       break;
     case R_AARCH64_TLS_TPREL:
       if (dso->ehdr.e_type == ET_EXEC && info->resolvetls)
-	write_neclass (dso, rela->r_offset,
-		       value + rela->r_addend + info->resolvetls->offset);
+	write_ne64 (dso, rela->r_offset,
+		    value + rela->r_addend + info->resolvetls->offset);
       break;
     case R_AARCH64_TLSDESC:
       if (!dso->info_DT_TLSDESC_PLT)
@@ -182,7 +166,7 @@ aarch64_prelink_rela (struct prelink_info *info, GElf_Rela *rela,
 		 dso->filename);
 	  return 1;
 	}
-      val = read_uneclass (dso, rela->r_offset);
+      val = read_une64 (dso, rela->r_offset);
       if (val != 0 && !dynamic_info_is_set (dso, DT_GNU_PRELINKED_BIT))
 	{
 	  error (0, 0,
@@ -190,10 +174,10 @@ aarch64_prelink_rela (struct prelink_info *info, GElf_Rela *rela,
 		 dso->filename, val);
 	  return 1;
 	}
-      write_neclass (dso, rela->r_offset, dso->info_DT_TLSDESC_PLT);
+      write_ne64 (dso, rela->r_offset, dso->info_DT_TLSDESC_PLT);
       break;
     case R_AARCH64_TLS_DTPREL:
-      write_neclass (dso, rela->r_offset, value + rela->r_addend);
+      write_ne64 (dso, rela->r_offset, value + rela->r_addend);
       break;
     case R_AARCH64_TLS_DTPMOD:
       if (dso->ehdr.e_type == ET_EXEC)
@@ -227,7 +211,7 @@ aarch64_apply_conflict_rela (struct prelink_info *info, GElf_Rela *rela,
     case R_AARCH64_GLOB_DAT:
     case R_AARCH64_JUMP_SLOT:
     case R_AARCH64_ABS64:
-      buf_write_neclass (info->dso, buf, rela->r_addend);
+      buf_write_ne64 (info->dso, buf, rela->r_addend);
       break;
     case R_AARCH64_ABS32:
       buf_write_ne32 (info->dso, buf, rela->r_addend);
@@ -268,7 +252,7 @@ aarch64_apply_rela (struct prelink_info *info, GElf_Rela *rela, char *buf)
       break;
     case R_AARCH64_GLOB_DAT:
     case R_AARCH64_JUMP_SLOT:
-      buf_write_neclass (info->dso, buf, value + rela->r_addend);
+      buf_write_ne64 (info->dso, buf, value + rela->r_addend);
       break;
     case R_AARCH64_ABS64:
       buf_write_ne64 (info->dso, buf, value + rela->r_addend);
@@ -499,15 +483,15 @@ aarch64_undo_prelink_rela (DSO *dso, GElf_Rela *rela, GElf_Addr relaaddr)
 	}
       else
 	{
-	  Elf64_Addr data = read_uneclass (dso, dso->shdr[sec].sh_addr + 8);
+	  Elf64_Addr data = read_une64 (dso, dso->shdr[sec].sh_addr + 8);
 
 	  assert (rela->r_offset >= dso->shdr[sec].sh_addr + 24);
 	  assert (((rela->r_offset - dso->shdr[sec].sh_addr) & 7) == 0);
-	  write_neclass (dso, rela->r_offset, data);
+	  write_ne64 (dso, rela->r_offset, data);
 	}
       break;
     case R_AARCH64_GLOB_DAT:
-      write_neclass (dso, rela->r_offset, 0);
+      write_ne64 (dso, rela->r_offset, 0);
       break;
     case R_AARCH64_ABS64:
     case R_AARCH64_TLS_DTPMOD:

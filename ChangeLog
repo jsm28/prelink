@@ -1,5 +1,10 @@
 2020-02-20  Joseph Myers  <joseph@codesourcery.com>
 
+	* src/arch-aarch64.c (read_uneclass, write_neclass)
+	(buf_write_neclass): Remove macros.  All callers changed.
+
+2020-02-20  Joseph Myers  <joseph@codesourcery.com>
+
 	* src/arch-aarch64.c: Fix formatting.
 
 2020-02-20  Joseph Myers  <joseph@codesourcery.com>
