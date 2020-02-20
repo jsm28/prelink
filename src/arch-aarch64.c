@@ -221,6 +221,7 @@ static int
 aarch64_apply_conflict_rela (struct prelink_info *info, GElf_Rela *rela,
 			    char *buf, GElf_Addr dest_addr)
 {
+  GElf_Rela *ret;
   switch (GELF_R_TYPE (rela->r_info))
     {
     case R_AARCH64_GLOB_DAT:
@@ -230,6 +231,16 @@ aarch64_apply_conflict_rela (struct prelink_info *info, GElf_Rela *rela,
       break;
     case R_AARCH64_ABS32:
       buf_write_ne32 (info->dso, buf, rela->r_addend);
+      break;
+    case R_AARCH64_IRELATIVE:
+      if (dest_addr == 0)
+	return 5;
+      ret = prelink_conflict_add_rela (info);
+      if (ret == NULL)
+	return 1;
+      ret->r_offset = dest_addr;
+      ret->r_info = GELF_R_INFO (0, R_AARCH64_IRELATIVE);
+      ret->r_addend = rela->r_addend;
       break;
     default:
       abort ();
@@ -311,12 +322,15 @@ aarch64_prelink_conflict_rela (DSO *dso, struct prelink_info *info,
 	  break;
 	case R_AARCH64_TLSDESC:
 	  break;
+	  /* Similarly IRELATIVE relocations always need conflicts.  */
+	case R_AARCH64_IRELATIVE:
+	  break;
 	default:
 	  return 0;
 	}
       value = 0;
     }
-  else if (conflict->ifunc)
+  else if (info->dso == dso && !conflict->ifunc)
     return 0;
   else
     {
@@ -340,7 +354,10 @@ aarch64_prelink_conflict_rela (DSO *dso, struct prelink_info *info,
     case R_AARCH64_JUMP_SLOT:
     case R_AARCH64_ABS64:
     case R_AARCH64_ABS32:
+    case R_AARCH64_IRELATIVE:
       ret->r_addend = value + rela->r_addend;
+      if (conflict != NULL && conflict->ifunc)
+	ret->r_info = GELF_R_INFO (0, R_AARCH64_IRELATIVE);
       break;
     case R_AARCH64_COPY:
       error (0, 0, "R_AARCH64_COPY should not be present in shared libraries");
@@ -469,6 +486,7 @@ aarch64_undo_prelink_rela (DSO *dso, GElf_Rela *rela, GElf_Addr relaaddr)
     {
     case R_AARCH64_NONE:
     case R_AARCH64_RELATIVE:
+    case R_AARCH64_IRELATIVE:
       break;
     case R_AARCH64_JUMP_SLOT:
       sec = addr_to_sec (dso, rela->r_offset);

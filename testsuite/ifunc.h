@@ -70,6 +70,11 @@ asm (".text\n"						\
      #name ":\n"					\
      IFUNC_ASM (PICK (fn1, fn2))			\
      "\t.size " #name ", .-" #name "\n")
+#elif defined __aarch64__
+# define IFUNC_ASM(fn)					\
+     "\tadrp x0, " fn "\n"				\
+     "\tadd x0, x0, :lo12:" fn "\n"			\
+     "\tret\n"
 #else
 # error Architecture not supported
 #endif
