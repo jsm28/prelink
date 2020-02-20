@@ -48,7 +48,7 @@
 
 static int
 aarch64_adjust_dyn (DSO *dso, int n, GElf_Dyn *dyn, GElf_Addr start,
-		   GElf_Addr adjust)
+		    GElf_Addr adjust)
 {
   int testec = addr_to_sec (dso, dyn->d_un.d_ptr);
   if (dyn->d_tag == DT_PLTGOT)
@@ -69,7 +69,7 @@ aarch64_adjust_dyn (DSO *dso, int n, GElf_Dyn *dyn, GElf_Addr start,
  * .got section entry is missing in .dynamic section
  * .got section is previous to .got.plt section.
  */
-	data = read_une64 (dso, dso->shdr[sec - 1].sh_addr);
+      data = read_une64 (dso, dso->shdr[sec - 1].sh_addr);
       if (data == dso->shdr[n].sh_addr && data >= start)
 	write_ne64 (dso, dso->shdr[sec - 1].sh_addr, data + adjust);
 /* AARCH64 Hack  end*/
@@ -96,7 +96,7 @@ aarch64_adjust_dyn (DSO *dso, int n, GElf_Dyn *dyn, GElf_Addr start,
 
 static int
 aarch64_adjust_rel (DSO *dso, GElf_Rel *rel, GElf_Addr start,
-		   GElf_Addr adjust)
+		    GElf_Addr adjust)
 {
   error (0, 0, "%s: aarch64 doesn't support REL relocs", dso->filename);
   return 1;
@@ -104,7 +104,7 @@ aarch64_adjust_rel (DSO *dso, GElf_Rel *rel, GElf_Addr start,
 
 static int
 aarch64_adjust_rela (DSO *dso, GElf_Rela *rela, GElf_Addr start,
-		    GElf_Addr adjust)
+		     GElf_Addr adjust)
 {
   Elf64_Addr addr;
 
@@ -140,7 +140,7 @@ aarch64_prelink_rel (struct prelink_info *info, GElf_Rel *rel, GElf_Addr reladdr
 
 static int
 aarch64_prelink_rela (struct prelink_info *info, GElf_Rela *rela,
-		     GElf_Addr relaaddr)
+		      GElf_Addr relaaddr)
 {
   DSO *dso;
   GElf_Addr value;
@@ -172,7 +172,7 @@ aarch64_prelink_rela (struct prelink_info *info, GElf_Rela *rela,
     case R_AARCH64_TLS_TPREL:
       if (dso->ehdr.e_type == ET_EXEC && info->resolvetls)
 	write_neclass (dso, rela->r_offset,
-    value + rela->r_addend + info->resolvetls->offset);
+		       value + rela->r_addend + info->resolvetls->offset);
       break;
     case R_AARCH64_TLSDESC:
       if (!dso->info_DT_TLSDESC_PLT)
@@ -219,7 +219,7 @@ aarch64_prelink_rela (struct prelink_info *info, GElf_Rela *rela,
 
 static int
 aarch64_apply_conflict_rela (struct prelink_info *info, GElf_Rela *rela,
-			    char *buf, GElf_Addr dest_addr)
+			     char *buf, GElf_Addr dest_addr)
 {
   GElf_Rela *ret;
   switch (GELF_R_TYPE (rela->r_info))
@@ -289,7 +289,7 @@ aarch64_apply_rela (struct prelink_info *info, GElf_Rela *rela, char *buf)
 
 static int
 aarch64_prelink_conflict_rel (DSO *dso, struct prelink_info *info, GElf_Rel *rel,
-			   GElf_Addr reladdr)
+			      GElf_Addr reladdr)
 {
   error (0, 0, "%s: aarch64 doesn't support REL relocs", dso->filename);
   return 1;
@@ -297,7 +297,7 @@ aarch64_prelink_conflict_rel (DSO *dso, struct prelink_info *info, GElf_Rel *rel
 
 static int
 aarch64_prelink_conflict_rela (DSO *dso, struct prelink_info *info,
-			    GElf_Rela *rela, GElf_Addr relaaddr)
+			       GElf_Rela *rela, GElf_Addr relaaddr)
 {
   GElf_Addr value;
   struct prelink_conflict *conflict;
@@ -389,9 +389,9 @@ aarch64_prelink_conflict_rela (DSO *dso, struct prelink_info *info,
 	}
       break;
     case R_AARCH64_TLSDESC:
-	  tls = conflict ? conflict->lookup.tls : info->curtls;
-	  ret->r_addend = value + rela->r_addend + tls->offset;
-     break;
+      tls = conflict ? conflict->lookup.tls : info->curtls;
+      ret->r_addend = value + rela->r_addend + tls->offset;
+      break;
     default:
       error (0, 0, "%s: Unknown AARCH64 relocation type %d", dso->filename,
 	     (int) GELF_R_TYPE (rela->r_info));
