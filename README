@@ -50,3 +50,9 @@ issue has been traced down to the latest binutils being unable to link with
 fail before being prelinked.  See:
 
 https://bugzilla.yoctoproject.org/show_bug.cgi?id=10168
+
+AArch64 prelink may not support big-endian (it only knows about the
+little-endian dynamic linker name) and does not support ILP32.  TLS
+only works with AArch64 prelink if the -mtls-dialect=trad option is
+used or the subtraction of the thread pointer from the return value is
+removed from _dl_tlsdesc_undefweak in glibc.
