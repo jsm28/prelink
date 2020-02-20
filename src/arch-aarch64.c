@@ -520,6 +520,7 @@ aarch64_undo_prelink_rela (DSO *dso, GElf_Rela *rela, GElf_Addr relaaddr)
       break;
     case R_AARCH64_TLSDESC:
       write_ne64 (dso, rela->r_offset, 0);
+      break;
     case R_AARCH64_ABS32:
       write_ne32 (dso, rela->r_offset, 0);
       break;

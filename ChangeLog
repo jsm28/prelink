@@ -1,3 +1,8 @@
+2020-02-20  Joseph Myers  <joseph@codesourcery.com>
+
+	* src/arch-aarch64.c (aarch64_undo_prelink_rela): Fix missing
+	break.
+
 2020-02-19  Joseph Myers  <joseph@codesourcery.com>
 
 	* src/arch-aarch64.c (aarch64_apply_conflict_rela)
