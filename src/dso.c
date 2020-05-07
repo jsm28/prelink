@@ -221,8 +221,22 @@ check_dso (DSO *dso)
 	      || RELOCATE_SCN (dso->shdr[last].sh_flags)
 	      || RELOCATE_SCN (dso->shdr[i].sh_flags))
 	    {
-	      error (0, 0, "%s: section file offsets not monotonically increasing",
-		     dso->filename);
+              int j = 0;
+              for (j = 1; j < dso->ehdr.e_shnum; ++j) {
+                  const char *name
+                    = strptr (dso, dso->ehdr.e_shstrndx, dso->shdr[j].sh_name);
+
+                  error(0, 0, "section %d %s file offset range %08lx and %08lx",
+                        j, name,
+                        dso->shdr[j].sh_offset,
+                        dso->shdr[j].sh_offset + (dso->shdr[j].sh_type == SHT_NOBITS ? 0 : dso->shdr[j].sh_size));
+              }
+
+	      error (0, 0, "%s: section [%d and %d] file offsets [%08lx and %08lx] not monotonically increasing",
+		     dso->filename, last, i, 
+                     dso->shdr[last].sh_offset + (dso->shdr[last].sh_type == SHT_NOBITS ? 0 : dso->shdr[last].sh_size),
+                     dso->shdr[i].sh_offset
+                     );
 	      return 1;
 	    }
 	}
@@ -1141,6 +1155,25 @@ adjust_old_to_new (DSO *dso, GElf_Addr addr)
   return addr;
 }
 
+/* Return true is DSO is position independent executable.
+
+   There is no simple way to distinct between shared library
+   and PIE executable.  Use presence of interpreter as a heuristic.  */
+
+int dso_is_pie(DSO *dso)
+{
+  int i;
+
+  if (dso->ehdr.e_type != ET_DYN)
+    return 0;
+
+  for (i = 0; i < dso->ehdr.e_phnum; ++i)
+    if (dso->phdr[i].p_type == PT_INTERP)
+      return 1;
+
+  return 0;
+}
+
 GElf_Addr
 adjust_new_to_old (DSO *dso, GElf_Addr addr)
 {
@@ -1659,7 +1692,7 @@ close_dso_1 (DSO *dso)
     {
       int i;
 
-      for (i = 1; i < dso->ehdr.e_shnum; ++i)
+      for (i = 1; i < dso->ehdr.e_shstrndx; ++i)
 	{
 	  Elf_Scn *scn = dso->scn[i];
 	  Elf_Data *data = NULL;

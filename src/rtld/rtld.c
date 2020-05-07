@@ -215,6 +215,26 @@ parse_opt (int key, char *arg, struct argp_state *state)
    | (((type) == R_NIOS2_COPY) * ELF_RTYPE_CLASS_COPY)          \
    | (((type) == R_NIOS2_GLOB_DAT) * ELF_RTYPE_CLASS_EXTERN_PROTECTED_DATA(EM_ALTERA_NIOS2)))
 
+/* From glibc-2.24: sysdeps/microblaze/dl-machine.h */
+# define microblaze_elf_machine_type_class(type) \
+  (((type) == R_MICROBLAZE_JUMP_SLOT || \
+    (type) == R_MICROBLAZE_TLSDTPREL32 || \
+    (type) == R_MICROBLAZE_TLSDTPMOD32 || \
+    (type) == R_MICROBLAZE_TLSTPREL32) \
+    * ELF_RTYPE_CLASS_PLT \
+   | ((type) == R_MICROBLAZE_COPY) * ELF_RTYPE_CLASS_COPY)
+
+/* From glibc-2.27: sysdeps/riscv/dl-machine.h */
+#define riscv_elf_machine_type_class(type)                      \
+  ((ELF_RTYPE_CLASS_PLT * ((type) == R_RISCV_JUMP_SLOT          \
+     || ((type) == R_RISCV_TLS_DTPREL32)    \
+     || ((type) == R_RISCV_TLS_DTPMOD32)    \
+     || ((type) == R_RISCV_TLS_TPREL32)     \
+     || ((type) == R_RISCV_TLS_DTPREL64)    \
+     || ((type) == R_RISCV_TLS_DTPMOD64)    \
+     || ((type) == R_RISCV_TLS_TPREL64)))   \
+   | (ELF_RTYPE_CLASS_COPY * ((type) == R_RISCV_COPY)))
+
 int
 elf_machine_type_class (int type, int machine)
 {
@@ -243,6 +263,10 @@ elf_machine_type_class (int type, int machine)
 	return sparc64_elf_machine_type_class(type);
     case EM_ALTERA_NIOS2:
 	return nios2_elf_machine_type_class(type);
+    case EM_MICROBLAZE:
+	return microblaze_elf_machine_type_class(type);
+    case EM_RISCV:
+	return riscv_elf_machine_type_class(type);
 
     default:
       printf ("Unknown architecture!\n");
@@ -284,6 +308,8 @@ machine_no_rela (int machine)
     case EM_SPARC32PLUS:
     case EM_SPARCV9:
     case EM_ALTERA_NIOS2:
+    case EM_MICROBLAZE:
+    case EM_RISCV:
       return 0;
     default:
       return 1;
@@ -317,6 +343,8 @@ is_ldso_soname (const char *soname)
       || ! strcmp (soname, "ld-linux-aarch64.so.1")
       || ! strcmp (soname, "ld-linux-aarch64_be.so.1")
       || ! strcmp (soname, "ld-linux-nios2.so.1")
+      || ! strcmp (soname, "ld-linux-riscv64-lp64.so.1")
+      || ! strcmp (soname, "ld-linux-riscv64-lp64d.so.1")
      )
     return 1;
   return 0;
@@ -409,7 +437,7 @@ free_path (struct search_path *path)
 }
 
 void
-load_ld_so_conf (int use_64bit, int use_mipsn32)
+load_ld_so_conf (int use_64bit, int use_mipsn32, int use_x32)
 {
   int fd;
   FILE *conf;
@@ -434,6 +462,14 @@ load_ld_so_conf (int use_64bit, int use_mipsn32)
       add_dir (&ld_dirs, "/lib32", strlen ("/lib32"));
       add_dir (&ld_dirs, "/usr/lib32/tls", strlen ("/usr/lib32/tls"));
       add_dir (&ld_dirs, "/usr/lib32", strlen ("/usr/lib32"));
+    }
+  else if (use_x32)
+    {
+      dst_LIB = "libx32";
+      add_dir (&ld_dirs, "/libx32/tls", strlen ("/libx32/tls"));
+      add_dir (&ld_dirs, "/libx32", strlen ("/libx32"));
+      add_dir (&ld_dirs, "/usr/libx32/tls", strlen ("/usr/libx32/tls"));
+      add_dir (&ld_dirs, "/usr/libx32", strlen ("/usr/libx32"));
     }
   else
     {
@@ -686,6 +722,25 @@ find_lib_by_soname (const char *soname, struct dso_list *loader,
   return NULL;
 }
 
+static void
+add_dso_to_needed (struct dso_list *cur_dso_ent, struct dso_list *new_dso_ent)
+{
+  if (!cur_dso_ent->needed)
+    {
+      cur_dso_ent->needed = malloc (sizeof (struct needed_list));
+      cur_dso_ent->needed_tail = cur_dso_ent->needed;
+      cur_dso_ent->needed_tail->ent = new_dso_ent;
+      cur_dso_ent->needed_tail->next = NULL;
+    }
+  else if (!in_needed_list (cur_dso_ent->needed, new_dso_ent->name))
+    {
+      cur_dso_ent->needed_tail->next = malloc (sizeof (struct needed_list));
+      cur_dso_ent->needed_tail = cur_dso_ent->needed_tail->next;
+      cur_dso_ent->needed_tail->ent = new_dso_ent;
+      cur_dso_ent->needed_tail->next = NULL;
+    }
+}
+
 static struct dso_list *
 load_dsos (DSO *dso, int host_paths)
 {
@@ -812,6 +867,8 @@ load_dsos (DSO *dso, int host_paths)
 			  dso_list_tail->canon_filename = strdup(soname);
 			  dso_list_tail->err_no = errno;
 
+                          add_dso_to_needed(cur_dso_ent, new_dso_ent);
+
 			  continue;
 			}
 
@@ -854,20 +911,7 @@ load_dsos (DSO *dso, int host_paths)
 			dso_list_tail->name = new_dso->soname;
 		    }
 
-		  if (!cur_dso_ent->needed)
-		    {
-		      cur_dso_ent->needed = malloc (sizeof (struct needed_list));
-		      cur_dso_ent->needed_tail = cur_dso_ent->needed;
-		      cur_dso_ent->needed_tail->ent = new_dso_ent;
-		      cur_dso_ent->needed_tail->next = NULL;
-		    }
-		  else if (!in_needed_list (cur_dso_ent->needed, soname))
-		    {
-		      cur_dso_ent->needed_tail->next = malloc (sizeof (struct needed_list));
-		      cur_dso_ent->needed_tail = cur_dso_ent->needed_tail->next;
-		      cur_dso_ent->needed_tail->ent = new_dso_ent;
-		      cur_dso_ent->needed_tail->next = NULL;
-		    }
+                  add_dso_to_needed(cur_dso_ent, new_dso_ent);
 
 		  continue;
 		}
@@ -1194,8 +1238,9 @@ main(int argc, char **argv)
 	  goto exit;
 	}
 
-      load_ld_so_conf (gelf_getclass (dso->elf) == ELFCLASS64, 
-		( dso->ehdr.e_machine == EM_MIPS) && ( dso->ehdr.e_flags & EF_MIPS_ABI2 ) );
+      load_ld_so_conf ( (gelf_getclass (dso->elf) == ELFCLASS64) && (dso->ehdr.e_machine != EM_RISCV),
+		(dso->ehdr.e_machine == EM_MIPS) && (dso->ehdr.e_flags & EF_MIPS_ABI2),
+		dso->ehdr.e_machine == EM_X86_64 && gelf_getclass (dso->elf) == ELFCLASS32 );
 
       if (multiple)
 	printf ("%s:\n", argv[remaining]);
